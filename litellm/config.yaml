@@ -1,0 +1,30 @@
+# LiteLLM proxy — internal routing layer. It sits BEHIND the auth-gateway and is
+# never exposed to the public network, so it uses a simple internal master key.
+# (If you have LiteLLM Enterprise you can delete the auth-gateway entirely and set
+#  enable_jwt_auth here instead — see README "Alternative: LiteLLM Enterprise".)
+
+model_list:
+  - model_name: llama3.2                      # the name clients request
+    litellm_params:
+      model: ollama_chat/llama3.2:3b          # backend model
+      api_base: http://ollama:11434
+
+  - model_name: qwen-coder                  # Qwen2.5-Coder, served by llama.cpp
+    litellm_params:
+      model: openai/qwen-coder
+      api_base: http://llamacpp:8080/v1
+      api_key: "none"
+
+  # Add more backends here — e.g. a vLLM box, or a hosted provider as fallback:
+  # - model_name: llama-3.1-8b
+  #   litellm_params:
+  #     model: openai/meta-llama/Llama-3.1-8B-Instruct
+  #     api_base: http://your-vllm-host:8000/v1
+  #     api_key: os.environ/VLLM_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY   # internal only; injected by the gateway
+
+litellm_settings:
+  drop_params: true                            # tolerate params a local model ignores
+  callbacks: ["langfuse_otel"]

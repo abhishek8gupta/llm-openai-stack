@@ -1,0 +1,65 @@
+# ---------------------------------------------------------------
+# Secrets — NEVER commit these
+# ---------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.secret
+*.secrets
+secrets/
+*.pem
+*.key
+*.crt
+*.bak*
+
+# The RENDERED Keycloak realm contains real client secrets + password hashes.
+# Ignore it, but KEEP the template (realm-export.template.json) committed —
+# setup.sh renders the real file from the template at deploy time.
+keycloak/realm-export.json
+
+# ---------------------------------------------------------------
+# Model files and runtime data (large / machine-specific)
+# ---------------------------------------------------------------
+*.gguf
+*.safetensors
+*.bin
+models/
+data/
+volumes/
+ollama/
+open-webui-data/
+keycloak-data/
+postgres-data/
+portainer-data/
+
+# ---------------------------------------------------------------
+# Backups and editor leftovers
+# ---------------------------------------------------------------
+*.bak
+*.orig
+*.swp
+*~
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ---------------------------------------------------------------
+# Python / Jupyter
+# ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+jupyter-env/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# ---------------------------------------------------------------
+# Logs
+# ---------------------------------------------------------------
+*.log
+logs/

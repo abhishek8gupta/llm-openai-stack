@@ -1,0 +1,93 @@
+services:
+  # ---- Identity Provider -------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    ports:
+      - "8080:8080"
+    networks: [llmnet]
+
+  # ---- Inference backend -------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks: [llmnet]
+    # ---- GPU (optional): uncomment to use an NVIDIA GPU ----
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ---- OpenAI-compatible routing layer (behind the gateway) --------------
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      LITELLM_OTEL_V2: "true"
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY}
+      LANGFUSE_HOST: ${LANGFUSE_BASE_URL}       # set in .env (e.g. http://<SERVER_IP>:3001)
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml:ro
+    depends_on: [ollama]
+    networks: [llmnet]      # intentionally NOT published — internal only
+
+  # ---- OAuth 2.0 resource server (the public API endpoint) ---------------
+  auth-gateway:
+    build: ./auth-gateway
+    environment:
+      JWKS_URL: http://keycloak:8080/realms/${REALM}/protocol/openid-connect/certs
+      JWT_ISSUER: ${PUBLIC_KEYCLOAK_URL}/realms/${REALM}
+      JWT_AUDIENCE: llm-api
+      REQUIRED_ROLE: llm_user
+      UPSTREAM_URL: http://litellm:4000
+      UPSTREAM_KEY: ${LITELLM_MASTER_KEY}
+      GATEWAY_SERVICE_TOKEN: ${GATEWAY_SERVICE_TOKEN}
+    depends_on: [litellm, keycloak]
+    ports:
+      - "4001:4001"        # <- this is your OpenAI-compatible base URL (/v1)
+    networks: [llmnet]
+
+  # ---- Web interface -----------------------------------------------------
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    environment:
+      OPENAI_API_BASE_URL: http://auth-gateway:4001/v1
+      OPENAI_API_KEY: ${GATEWAY_SERVICE_TOKEN}
+      ENABLE_OAUTH_SIGNUP: "true"
+      OAUTH_CLIENT_ID: open-webui
+      OAUTH_CLIENT_SECRET: ${OPENWEBUI_CLIENT_SECRET}
+      OPENID_PROVIDER_URL: ${PUBLIC_KEYCLOAK_URL}/realms/${REALM}/.well-known/openid-configuration
+      OAUTH_PROVIDER_NAME: Keycloak
+      OAUTH_SCOPES: "openid email profile"
+      OPENID_REDIRECT_URI: ${PUBLIC_OPENWEBUI_URL}/oauth/oidc/callback
+      WEBUI_URL: ${PUBLIC_OPENWEBUI_URL}
+      WEBUI_SESSION_COOKIE_SECURE: "false"
+      WEBUI_SESSION_COOKIE_SAME_SITE: "lax"
+    volumes:
+      - openwebui-data:/app/backend/data
+    depends_on: [auth-gateway]
+    ports:
+      - "3000:8080"
+    networks: [llmnet]
+
+networks:
+  llmnet:
+
+volumes:
+  ollama-data:
+  openwebui-data:

@@ -1,0 +1,103 @@
+{
+  "realm": "llmdemo",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "llm_user",
+        "description": "May call the LLM API through the gateway"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "llm-api",
+      "name": "LLM API (resource server)",
+      "description": "Bearer-only resource server. Tokens carrying this in `aud` are accepted by the auth-gateway.",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "open-webui",
+      "name": "Open WebUI (chat frontend)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${OPENWEBUI_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/oauth/oidc/callback",
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": ["http://localhost:3000"],
+      "defaultClientScopes": ["openid", "email", "profile", "roles"],
+      "protocolMappers": [
+        {
+          "name": "llm-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "llm-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "llm-cli",
+      "name": "Programmatic client (client-credentials)",
+      "description": "For service-to-service / CLI access via the OAuth client-credentials grant.",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "${LLMCLI_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "llm-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "llm-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "demo",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "demo@example.com",
+      "firstName": "Demo",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["llm_user"]
+    },
+    {
+      "username": "service-account-llm-cli",
+      "enabled": true,
+      "serviceAccountClientId": "llm-cli",
+      "realmRoles": ["llm_user"]
+    }
+  ]
+}
